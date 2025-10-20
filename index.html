@@ -4,11 +4,23 @@
     <meta charset="UTF-8">
     <title>E-Donos</title>
     <style>
+
+        .navigation{
+            display: inline-block;
+            background-color: rgb(16, 59, 107);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-family: sans-serif;
+        }
+        .navigation:hover{
+            background-color: aqua;
+        }
         body {
             font-family: Arial, sans-serif;
             text-align: center;
             padding-top: 50px;
-            background-color: lightblue;
+            background-color: rgb(16, 59, 107);
         }
 
         form {
@@ -43,20 +55,11 @@
 </head>
 <body>
     <h1>WITAJ NA E-DONOS</h1>
-    <form action="#" method="post">
-        <label for="imie">Imię:</label>
-        <input type="text" id="imie" name="imie" required>
+    <a href="index.html" class="navigation">Strona Główna</a>
+ <a href="zawiadomienie.html" class="navigation">Zawiadomienie</a>
+ <a class="navigation">Obywatel</a>
+ <a class="navigation">Komenda</a>
+ <a class="navigation">Pomoc</a>
 
-        <label for="nazwisko">Nazwisko:</label>
-        <input type="text" id="nazwisko" name="nazwisko" required>
-
-        <label for="opis">Opis zdarzenia:</label>
-        <textarea id="opis" name="opis" required></textarea>
-
-        <label for="data">Data zdarzenia:</label>
-        <input type="date" id="data" name="data" required>
-
-        <button type="submit">Wyślij</button>
-    </form>
 </body>
 </html>
