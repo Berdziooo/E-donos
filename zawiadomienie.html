@@ -3,65 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Donos/zawiadomienie</title>
+    <title>E-Donos / Zawiadomienie</title>
 
     <style>
-    .navigation{
-        display: inline-block;
-        background-color: rgb(16, 59, 107);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        font-family: sans-serif;
-    }
-    .navigation:hover{
-        background-color: aqua;
-    }
-    body {
-        font-family: Arial, sans-serif;
-        text-align: center;
-        padding-top: 50px;
-        background-color: rgb(16, 59, 107);
-    }
+        .navigation {
+            display: inline-block;
+            background-color: rgb(16, 59, 107);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-family: sans-serif;
+            text-decoration: none;
+        }
 
-    form {
-        display: inline-block;
-        text-align: left;
-    }
+        .navigation:hover {
+            background-color: aqua;
+            color: black;
+        }
 
-    label {
-        display: block;
-        margin-top: 20px;
-        font-weight: bold;
-    }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+            background-color: lightgray;
+        }
 
-    input[type="text"],
-    input[type="date"],
-    textarea {
-        width: 300px;
-        padding: 5px;
-        margin-top: 5px;
-    }
+        form {
+            display: inline-block;
+            text-align: left;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
 
-    textarea {
-        height: 100px;
-    }
+        label {
+            display: block;
+            margin-top: 20px;
+            font-weight: bold;
+        }
 
-    button {
-        margin-top: 20px;
-        padding: 10px 30px;
-        font-size: 16px;
-    }
-</style>
+        input[type="text"],
+        input[type="date"],
+        textarea {
+            width: 300px;
+            padding: 5px;
+            margin-top: 5px;
+        }
+
+        textarea {
+            height: 100px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 16px;
+        }
+
+        #wynikKomendy {
+            margin-top: 15px;
+            font-style: italic;
+            color: darkblue;
+        }
+    </style>
 </head>
 <body>
     <h1>E-DONOS</h1>
+
+    <!-- Nawigacja -->
     <a href="index.html" class="navigation">Strona Główna</a>
     <a href="zawiadomienie.html" class="navigation">Zawiadomienie</a>
-    <a class="navigation">Obywatel</a>
-    <a class="navigation">Komenda</a>
-    <a class="navigation">Pomoc</a>
-    <form action="#" method="post">
+    <a href="obywatel.html" class="navigation">Obywatel</a>
+    <a href="#" class="navigation">Komenda</a>
+    <a href="#" class="navigation">Pomoc</a>
+
+    <br><br>
+
+    <!-- Formularz -->
+    <form action="zapisz.php" method="post">
         <label for="imie">Imię:</label>
         <input type="text" id="imie" name="imie" required>
 
@@ -74,7 +93,113 @@
         <label for="data">Data zdarzenia:</label>
         <input type="date" id="data" name="data" required>
 
+        <!-- Ukryte pole na znalezioną komendę -->
+        <input type="hidden" id="komenda" name="komenda">
+
+        <button type="button" id="znajdzKomende">Znajdź najbliższą komendę policji</button>
+        <div id="wynikKomendy"></div>
+
         <button type="submit">Wyślij</button>
     </form>
+
+    <p>
+        <a href="index.html" class="navigation">Powrót do strony głównej</a>
+    </p>
+
+    <script>
+        // Funkcja obliczająca odległość (metry)
+        function odlegloscMetry(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const toRad = deg => deg * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) ** 2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Zapytanie do Overpass API
+        async function zapytajOverpass(lat, lon, radius) {
+            const query = `[out:json][timeout:25];
+            (
+                node["amenity"="police"](around:${radius},${lat},${lon});
+                way["amenity"="police"](around:${radius},${lat},${lon});
+                relation["amenity"="police"](around:${radius},${lat},${lon});
+            );
+            out center;`;
+            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+            const resp = await fetch(url);
+            const data = await resp.json();
+            return data.elements || [];
+        }
+
+        // Znajdowanie najbliższej komendy
+        async function znajdzNajblizszaKomende() {
+            const wynikDiv = document.getElementById('wynikKomendy');
+            wynikDiv.textContent = 'Pobieram Twoją lokalizację...';
+
+            if (!navigator.geolocation) {
+                wynikDiv.textContent = 'Twoja przeglądarka nie wspiera geolokalizacji.';
+                return;
+            }
+
+            const pozycja = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            }).catch(err => {
+                wynikDiv.textContent = 'Nie udało się pobrać lokalizacji.';
+                return null;
+            });
+
+            if (!pozycja) return;
+
+            const lat = pozycja.coords.latitude;
+            const lon = pozycja.coords.longitude;
+
+            const radii = [1000, 5000, 10000, 20000];
+            let znalezione = [];
+
+            for (const r of radii) {
+                wynikDiv.textContent = `Szukam komend w promieniu ${r} m...`;
+                const wyniki = await zapytajOverpass(lat, lon, r);
+                if (wyniki.length > 0) {
+                    znalezione = wyniki;
+                    break;
+                }
+            }
+
+            if (znalezione.length === 0) {
+                wynikDiv.textContent = 'Nie znaleziono komendy w pobliżu.';
+                return;
+            }
+
+            const komendy = znalezione.map(el => {
+                const elLat = el.lat ?? el.center?.lat;
+                const elLon = el.lon ?? el.center?.lon;
+                const name = el.tags?.name || 'Komenda Policji';
+                return {
+                    name,
+                    lat: elLat,
+                    lon: elLon,
+                    distance: odlegloscMetry(lat, lon, elLat, elLon)
+                };
+            });
+
+            komendy.sort((a, b) => a.distance - b.distance);
+            const najblizsza = komendy[0];
+
+            wynikDiv.innerHTML = `
+                ✅ <b>${najblizsza.name}</b><br>
+                Odległość: ${Math.round(najblizsza.distance)} m<br>
+                <a href="https://www.openstreetmap.org/?mlat=${najblizsza.lat}&mlon=${najblizsza.lon}#map=18/${najblizsza.lat}/${najblizsza.lon}" target="_blank">Pokaż na mapie</a>
+            `;
+
+            // Wstawienie do ukrytego pola formularza
+            document.getElementById('komenda').value = najblizsza.name;
+        }
+
+        document.getElementById('znajdzKomende').addEventListener('click', znajdzNajblizszaKomende);
+    </script>
 </body>
 </html>
