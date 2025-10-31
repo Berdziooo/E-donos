@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-Donos / Zawiadomienie</title>
-
     <style>
         .navigation {
             display: inline-block;
@@ -107,99 +106,128 @@
     </p>
 
     <script>
-        // Funkcja obliczająca odległość (metry)
-        function odlegloscMetry(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const toRad = deg => deg * Math.PI / 180;
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                Math.sin(dLon / 2) ** 2;
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
+// Obliczanie odległości w metrach między dwoma punktami (Haversine)
+function odlegloscMetry(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // promień Ziemi w metrach
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// Funkcja zapytania Overpass API
+async function zapytajOverpass(lat, lon, radius) {
+    const query = `
+[out:json][timeout:45];
+(
+  node["amenity"="policja"](around:${radius},${lat},${lon});
+  way["amenity"="policja"](around:${radius},${lat},${lon});
+  relation["amenity"="policja"](around:${radius},${lat},${lon});
+);
+out center;
+`;
+    const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        console.log(`Overpass response (radius ${radius} m):`, data.elements);
+        console.log(`LAT: ${lat}, LON: ${lon}, radius: ${r}`);
+console.log('Query URL:', url);
+
+        return data.elements || [];
+    } catch (e) {
+        console.error("Błąd zapytania Overpass:", e);
+        return [];
+    }
+}
+
+// Główna funkcja wyszukiwania najbliższej komendy
+async function znajdzNajblizszaKomende() {
+    const wynikDiv = document.getElementById('wynikKomendy');
+    if (!wynikDiv) {
+        console.error("Brak elementu #wynikKomendy w HTML!");
+        return;
+    }
+
+    wynikDiv.textContent = '📍 Pobieram Twoją lokalizację...';
+
+    if (!navigator.geolocation) {
+        wynikDiv.textContent = 'Twoja przeglądarka nie wspiera geolokalizacji.';
+        return;
+    }
+
+    const pozycja = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 100000,
+            maximumAge: 0
+        });
+    }).catch(err => {
+    console.error('Nie udało się pobrać lokalizacji:', err);
+    wynikDiv.textContent = 'Nie udało się pobrać lokalizacji. Spróbuj ponownie lub użyj lokalizacji ręcznej.';
+    return null;
+});
+
+
+    if (!pozycja) return;
+
+    const lat = pozycja.coords.latitude;
+    const lon = pozycja.coords.longitude;
+
+    const radii = [10000, 20000, 50000]; // większe promienie od razu
+    let znalezione = [];
+
+    for (const r of radii) {
+        wynikDiv.textContent = `🔍 Szukam komend w promieniu ${r} m...`;
+        const wyniki = await zapytajOverpass(lat, lon, r);
+        console.log(`RADIUS ${r}:`, wyniki);
+        if (wyniki.length > 0) {
+            znalezione = wyniki;
+            break;
         }
+    }
 
-        // Zapytanie do Overpass API
-        async function zapytajOverpass(lat, lon, radius) {
-            const query = `[out:json][timeout:25];
-            (
-                node["amenity"="police"](around:${radius},${lat},${lon});
-                way["amenity"="police"](around:${radius},${lat},${lon});
-                relation["amenity"="police"](around:${radius},${lat},${lon});
-            );
-            out center;`;
-            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
-            const resp = await fetch(url);
-            const data = await resp.json();
-            return data.elements || [];
-        }
+    if (znalezione.length === 0) {
+        wynikDiv.textContent = '🚫 Nie znaleziono komendy w pobliżu.';
+        return;
+    }
 
-        // Znajdowanie najbliższej komendy
-        async function znajdzNajblizszaKomende() {
-            const wynikDiv = document.getElementById('wynikKomendy');
-            wynikDiv.textContent = 'Pobieram Twoją lokalizację...';
+    const komendy = znalezione.map(el => {
+        const elLat = el.lat !== undefined ? el.lat : el.center?.lat;
+        const elLon = el.lon !== undefined ? el.lon : el.center?.lon;
+        if (elLat === undefined || elLon === undefined) return null; // pomiń brakujące dane
+        const name = el.tags?.name || 'Komenda Policji';
+        return {
+            name,
+            lat: elLat,
+            lon: elLon,
+            distance: odlegloscMetry(lat, lon, elLat, elLon)
+        };
+    }).filter(el => el !== null); // usuń null
 
-            if (!navigator.geolocation) {
-                wynikDiv.textContent = 'Twoja przeglądarka nie wspiera geolokalizacji.';
-                return;
-            }
+    if (komendy.length === 0) {
+        wynikDiv.textContent = '🚫 Nie udało się wyznaczyć współrzędnych żadnej komendy.';
+        return;
+    }
 
-            const pozycja = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject);
-            }).catch(err => {
-                wynikDiv.textContent = 'Nie udało się pobrać lokalizacji.';
-                return null;
-            });
+    komendy.sort((a, b) => a.distance - b.distance);
+    const najblizsza = komendy[0];
 
-            if (!pozycja) return;
+    wynikDiv.innerHTML = `
+        ✅ <b>${najblizsza.name}</b><br>
+        Odległość: ${Math.round(najblizsza.distance)} m<br>
+        <a href="https://www.openstreetmap.org/?mlat=${najblizsza.lat}&mlon=${najblizsza.lon}#map=18/${najblizsza.lat}/${najblizsza.lon}" target="_blank">Pokaż na mapie</a>
+    `;
 
-            const lat = pozycja.coords.latitude;
-            const lon = pozycja.coords.longitude;
+    const poleKomenda = document.getElementById('komenda');
+    if (poleKomenda) poleKomenda.value = najblizsza.name;
+}
 
-            const radii = [1000, 5000, 10000, 20000];
-            let znalezione = [];
+// Przycisk do wywołania wyszukiwania
+document.getElementById('znajdzKomende').addEventListener('click', znajdzNajblizszaKomende);
+</script>
 
-            for (const r of radii) {
-                wynikDiv.textContent = `Szukam komend w promieniu ${r} m...`;
-                const wyniki = await zapytajOverpass(lat, lon, r);
-                if (wyniki.length > 0) {
-                    znalezione = wyniki;
-                    break;
-                }
-            }
-
-            if (znalezione.length === 0) {
-                wynikDiv.textContent = 'Nie znaleziono komendy w pobliżu.';
-                return;
-            }
-
-            const komendy = znalezione.map(el => {
-                const elLat = el.lat ?? el.center?.lat;
-                const elLon = el.lon ?? el.center?.lon;
-                const name = el.tags?.name || 'Komenda Policji';
-                return {
-                    name,
-                    lat: elLat,
-                    lon: elLon,
-                    distance: odlegloscMetry(lat, lon, elLat, elLon)
-                };
-            });
-
-            komendy.sort((a, b) => a.distance - b.distance);
-            const najblizsza = komendy[0];
-
-            wynikDiv.innerHTML = `
-                ✅ <b>${najblizsza.name}</b><br>
-                Odległość: ${Math.round(najblizsza.distance)} m<br>
-                <a href="https://www.openstreetmap.org/?mlat=${najblizsza.lat}&mlon=${najblizsza.lon}#map=18/${najblizsza.lat}/${najblizsza.lon}" target="_blank">Pokaż na mapie</a>
-            `;
-
-            // Wstawienie do ukrytego pola formularza
-            document.getElementById('komenda').value = najblizsza.name;
-        }
-
-        document.getElementById('znajdzKomende').addEventListener('click', znajdzNajblizszaKomende);
-    </script>
 </body>
 </html>
