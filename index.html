@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <title>E-Donos</title>
     <style>
+
+        .navigation{
+            display: inline-block;
+            background-color: rgb(16, 59, 107);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-family: sans-serif;
+        }
+        .navigation:hover{
+            background-color: aqua;
+        }
         body {
             font-family: Arial, sans-serif;
             text-align: center;
@@ -11,37 +23,43 @@
             background-color: lightgray;
         }
 
-        .navigation {
+        form {
             display: inline-block;
-            background-color: rgb(16, 59, 107);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-family: sans-serif;
-            text-decoration: none;
-            margin: 5px;
-            transition: background-color 0.2s ease;
+            text-align: left;
         }
 
-        .navigation:hover {
-            background-color: aqua;
-            color: black;
+        label {
+            display: block;
+            margin-top: 20px;
+            font-weight: bold;
         }
 
-        h1 {
-            color: #222;
-            margin-bottom: 30px;
+        input[type="text"],
+        input[type="date"],
+        textarea {
+            width: 300px;
+            padding: 5px;
+            margin-top: 5px;
+        }
+
+        textarea {
+            height: 100px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
     <h1>WITAJ NA E-DONOS</h1>
-
     <a href="index.html" class="navigation">Strona Główna</a>
-    <a href="zawiadomienie.html" class="navigation">Zawiadomienie</a>
-    <a href="lista.php" class="navigation">Lista Donosów</a>
-    <a href="obywatel.html" class="navigation">Obywatel</a>
-    <a href="komenda.html" class="navigation">Komenda</a>
-    <a href="pomoc.html" class="navigation">Pomoc</a>
+ <a href="zawiadomienie.html" class="navigation">Zawiadomienie</a>
+ <a href="obywatel.html" class="navigation">Obywatel</a>
+ <a class="navigation">Komenda</a>
+ <a class="navigation">Pomoc</a>
+
 </body>
 </html>
